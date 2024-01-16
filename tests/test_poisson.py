@@ -85,7 +85,7 @@ def test_parametric_poisson():
         parameter_counter += 1
 
     # Solve another problem using FOM
-    new_f1, new_f2 = 1.5, 1.5  # New parameters for the test problem
+    new_f1, new_f2 = 1.65, 1.65  # New parameters for the test problem
     new_f = sin(new_f1 * pi * x) * cos(new_f2 * pi * y)
     new_L = -new_f * v * dx + Constant(0.0) * dot(tau, n) * ds
 
@@ -136,12 +136,17 @@ def test_parametric_poisson():
     error_norm = errornorm(full_solve_sol, rom_solve_sol)
     print("Error between FOM and ROM solutions:", error_norm)
 
-    # Assert that the error is below a certain threshold
-    assert error_norm < 1e-5  # You can adjust the threshold as needed
-
     # Split the solutions into components
     full_solve_sol_sigma, full_solve_sol_u = full_solve_sol.split()
     rom_solve_sol_sigma, rom_solve_sol_u = rom_solve_sol.split()
+
+    sigma_diff = Function(W.sub(0))  # Create a new Function in the appropriate subspace
+    sigma_diff.assign(full_solve_sol_sigma - rom_solve_sol_sigma)
+    sigma_diff.rename("sigma diff")
+
+    u_diff = Function(W.sub(1))  # Create a new Function in the appropriate subspace
+    u_diff.assign(full_solve_sol_u - rom_solve_sol_u)
+    u_diff.rename("u diff")
 
     full_solve_sol_sigma.rename("FOM sigma")
     full_solve_sol_u.rename("FOM u")
@@ -151,5 +156,13 @@ def test_parametric_poisson():
     # Write each component separately
     output_pvd_rom = File(f"{output_dir}/mixed_poisson_solution.pvd")
     output_pvd_rom.write(
-        full_solve_sol_u, rom_solve_sol_u, full_solve_sol_sigma, rom_solve_sol_sigma
+        full_solve_sol_u,
+        rom_solve_sol_u,
+        full_solve_sol_sigma,
+        rom_solve_sol_sigma,
+        sigma_diff,
+        u_diff,
     )
+
+    # Assert that the error is below a certain threshold
+    assert error_norm < 1e-5, f"Error norm is {error_norm}"
