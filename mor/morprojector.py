@@ -7,14 +7,14 @@ import scipy.sparse as sp
 
 def petsc2sp(A):
     """Creates scipy sparse matrix/numpy array from a PETSc matrix/vector.
-    
+
     :arg A: PETSc matrix/vector A
     :returns: Scipy sparse matrix/numpy array
     """
     if A.Type == PETSc.Vec.Type:
         return A.array.reshape(1, A.local_size)
     else:
-        if A.getInfo()['nz_used'] is 0.0:
+        if A.getInfo()["nz_used"] is 0.0:
             return sp.csr_matrix(A.size, shape=A.local_size)
         else:
             Asp = A.getValuesCSR()[::-1]
@@ -28,7 +28,8 @@ class MORProjector(object):
 
     :arg default_type: (optional) type for the assumed vector or matrix.
     """
-    def __init__(self, default_type='petsc'):
+
+    def __init__(self, default_type="petsc"):
         self.default_type = default_type
         self.snaps = []
         self.snap_mat = None
@@ -45,7 +46,9 @@ class MORProjector(object):
     def snapshots_to_matrix(self):
         """Convert the snapshots to a matrix"""
         # DOFs x timesteps
-        self.snap_mat = np.zeros((self.snaps[-1].function_space().dof_count, len(self.snaps)))
+        self.snap_mat = np.zeros(
+            (self.snaps[-1].function_space().dof_count, len(self.snaps))
+        )
 
         for snap, i in zip(self.snaps, range(len(self.snaps))):
             with snap.dat.vec as vec:
@@ -53,7 +56,9 @@ class MORProjector(object):
 
         return self.snap_mat.shape[1]
 
-    def compute_basis(self, n_basis, inner_product="L2", time_scaling=False, delta_t=None):
+    def compute_basis(
+        self, n_basis, inner_product="L2", time_scaling=False, delta_t=None
+    ):
         """
 
         :arg n_basis: Number of basis.
@@ -67,15 +72,19 @@ class MORProjector(object):
         if inner_product == "L2":
             ip_form = inner(TrialFunction(V), TestFunction(V)) * dx
         elif inner_product == "H1":
-            ip_form = inner(TrialFunction(V), TestFunction(V)) * dx + inner(grad(TrialFunction(V)),
-                                                                            grad(TestFunction(V))) * dx
+            ip_form = (
+                inner(TrialFunction(V), TestFunction(V)) * dx
+                + inner(grad(TrialFunction(V)), grad(TestFunction(V))) * dx
+            )
 
         ip_mat = assemble(ip_form, mat_type="aij").M.handle
 
         M = self.snapshots_to_matrix()
 
         # This matrix is symmetric positive semidefinite
-        corr_mat = np.matmul(self.snap_mat.transpose(), petsc2sp(ip_mat).dot(self.snap_mat))
+        corr_mat = np.matmul(
+            self.snap_mat.transpose(), petsc2sp(ip_mat).dot(self.snap_mat)
+        )
 
         # Build time scaling diagonal matrix
         if time_scaling is True and delta_t is not None:
@@ -111,13 +120,15 @@ class MORProjector(object):
         ratio = np.sum(w[:n_basis]) / np.sum(w[:M])
 
         self.basis_mat = PETSc.Mat().create(PETSc.COMM_WORLD)
-        self.basis_mat.setType('dense')
+        self.basis_mat.setType("dense")
         self.basis_mat.setSizes([self.snap_mat.shape[0], n_basis])
         self.basis_mat.setUp()
 
-        self.basis_mat.setValues(range(self.snap_mat.shape[0]),
-                                 range(n_basis),
-                                 psi_mat.reshape((self.snap_mat.shape[0], n_basis)))
+        self.basis_mat.setValues(
+            range(self.snap_mat.shape[0]),
+            range(n_basis),
+            psi_mat.reshape((self.snap_mat.shape[0], n_basis)),
+        )
 
         self.basis_mat.assemble()
 
@@ -128,26 +139,22 @@ class MORProjector(object):
         assert self.basis_mat is not None
         return self.basis_mat
 
-    def project_operator(self, oper, oper_type='petsc'):
+    def project_operator(self, oper, oper_type="petsc"):
         """Project an operator.
 
         :param oper: :class:`firedrake.matrix.Matrix`.
         :param oper_type: Type of returned operator.
         :return: Projected operator.
         """
-        if type(oper) is firedrake.matrix.Matrix:
-            A = oper.M.handle
-        else:
-            A = oper
-
+        A = oper.M.handle if type(oper) is firedrake.matrix.Matrix else oper
         Ap = A.PtAP(self.basis_mat)
 
-        if oper_type == 'petsc':
+        if oper_type == "petsc":
             return Ap
-        elif oper_type == 'scipy':
+        elif oper_type == "scipy":
             return petsc2sp(Ap).todense()
 
-    def project_function(self, f, func_type='petsc'):
+    def project_function(self, f, func_type="petsc"):
         """Project a function from full space to reduced space.
 
         :param f: :class:`firedrake.Function`.
@@ -161,25 +168,25 @@ class MORProjector(object):
         else:
             self.basis_mat.multTranspose(f, fp)
 
-        if func_type == 'petsc':
+        if func_type == "petsc":
             return fp
-        elif func_type == 'scipy':
+        elif func_type == "scipy":
             return fp.array
 
-    def recover_function(self, fp, func_type='petsc'):
+    def recover_function(self, fp, func_type="petsc"):
         """Recover project function from reduced space to full space.
 
         :param fp: Function of type func_type.
         :param func_type: Type of the input function.
         :return: Recovered function.
         """
-        if func_type == 'scipy':
+        if func_type == "scipy":
             fp_petsc, _ = self.basis_mat.createVecs()
             fp_petsc.setValues(range(fp.shape[0]), fp)
 
         f = firedrake.Function(self.snaps[-1].function_space())
         with f.dat.vec as vec:
-            if func_type == 'scipy':
+            if func_type == "scipy":
                 self.basis_mat.mult(fp_petsc, vec)
             else:
                 self.basis_mat.mult(fp, vec)

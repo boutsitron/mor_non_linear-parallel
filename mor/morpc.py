@@ -52,18 +52,22 @@ class MORPC(PCBase):
 
     def assembleK(self):
         ctx = self.ctx
-        mat_type = PETSc.Options().getString(self.prefix + "assembled_mat_type", "aij")
+        mat_type = PETSc.Options().getString(f"{self.prefix}assembled_mat_type", "aij")
 
-        self.K = allocate_matrix(ctx.a, bcs=ctx.row_bcs,
-                                 form_compiler_parameters=ctx.fc_params,
-                                 mat_type=mat_type)
+        self.K = allocate_matrix(
+            ctx.a,
+            bcs=ctx.row_bcs,
+            form_compiler_parameters=ctx.fc_params,
+            mat_type=mat_type,
+        )
 
-        self._assemble_K = create_assembly_callable(ctx.a, tensor=self.K,
-                                                    bcs=ctx.row_bcs,
-                                                    form_compiler_parameters=ctx.fc_params,
-                                                    mat_type=mat_type)
+        self._assemble_K = create_assembly_callable(
+            ctx.a,
+            tensor=self.K,
+            bcs=ctx.row_bcs,
+            form_compiler_parameters=ctx.fc_params,
+            mat_type=mat_type,
+        )
         self._assemble_K()
 
         self.mat_type = mat_type
-
-        self.K.force_evaluation()

@@ -1,0 +1,4 @@
+*.pvd
+*.*vtu
+docs/build
+*/__pycache__
