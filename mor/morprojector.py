@@ -13,12 +13,10 @@ def petsc2sp(A):
     """
     if A.Type == PETSc.Vec.Type:
         return A.array.reshape(1, A.local_size)
-    else:
-        if A.getInfo()["nz_used"] is 0.0:
-            return sp.csr_matrix(A.size, shape=A.local_size)
-        else:
-            Asp = A.getValuesCSR()[::-1]
-            return sp.csr_matrix(Asp, shape=A.local_size)
+    if A.getInfo()["nz_used"] == 0.0:
+        return sp.csr_matrix(A.size, shape=A.local_size)
+    Asp = A.getValuesCSR()[::-1]
+    return sp.csr_matrix(Asp, shape=A.local_size)
 
 
 class MORProjector(object):
@@ -44,17 +42,33 @@ class MORProjector(object):
         self.snaps.append(u.copy(deepcopy=True))
 
     def snapshots_to_matrix(self):
-        """Convert the snapshots to a matrix"""
-        # DOFs x timesteps
-        self.snap_mat = np.zeros(
-            (self.snaps[-1].function_space().dof_count, len(self.snaps))
-        )
+        """Convert the snapshots to a matrix suitable for mixed function spaces."""
+        if not self.snaps:
+            raise ValueError("No snapshots available to form a matrix.")
 
-        for snap, i in zip(self.snaps, range(len(self.snaps))):
-            with snap.dat.vec as vec:
-                self.snap_mat[:, i] = vec.array
+        # Determine the total number of DoFs for the mixed function space
+        total_dofs = sum(fs.dof_count for fs in self.snaps[0].function_space())
 
-        return self.snap_mat.shape[1]
+        # Initialize the snapshot matrix
+        self.snap_mat = np.zeros((total_dofs, len(self.snaps)))
+
+        # Fill the matrix with data from each snapshot
+        for col, snap in enumerate(self.snaps):
+            # Start index for filling the snapshot data
+            start_idx = 0
+
+            for component in snap.split():  # Split the mixed space solution
+                with component.dat.vec_ro as vec:
+                    # Number of DoFs for this component
+                    num_dofs = vec.getSize()
+
+                    # Fill the corresponding section of the column
+                    self.snap_mat[start_idx : start_idx + num_dofs, col] = vec.array
+
+                    # Update the start index for the next component
+                    start_idx += num_dofs
+
+        return total_dofs
 
     def compute_basis(
         self, n_basis, inner_product="L2", time_scaling=False, delta_t=None
@@ -112,7 +126,10 @@ class MORProjector(object):
             # Reduce number of basis to min(n_basis, first_negative_eigenvalue)
             n_basis = np.minimum(n_basis, idx_neg[0][0])
 
-        psi_mat = np.zeros((self.snaps[-1].function_space().dof_count, n_basis))
+        # Calculate the total DoFs for the mixed function space
+        total_dofs = sum(fs.dof_count for fs in V)
+
+        psi_mat = np.zeros((total_dofs, n_basis))
 
         for i in range(n_basis):
             psi_mat[:, i] = self.snap_mat.dot(v[:, i]) / np.sqrt(w[i])
@@ -121,13 +138,13 @@ class MORProjector(object):
 
         self.basis_mat = PETSc.Mat().create(PETSc.COMM_WORLD)
         self.basis_mat.setType("dense")
-        self.basis_mat.setSizes([self.snap_mat.shape[0], n_basis])
+        self.basis_mat.setSizes([total_dofs, n_basis])
         self.basis_mat.setUp()
 
         self.basis_mat.setValues(
-            range(self.snap_mat.shape[0]),
+            range(total_dofs),
             range(n_basis),
-            psi_mat.reshape((self.snap_mat.shape[0], n_basis)),
+            psi_mat.reshape((total_dofs, n_basis)),
         )
 
         self.basis_mat.assemble()

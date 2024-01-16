@@ -4,14 +4,16 @@ import sys
 import os
 
 # Get the directory of the current file
-test_file_dir = os.path.dirname(os.path.abspath(__file__))
+script_dir = os.path.dirname(os.path.abspath(__file__))
 # Add the parent directory (or another appropriate directory) to sys.path
-sys.path.append(os.path.join(test_file_dir, ".."))
+sys.path.append(os.path.join(script_dir, ".."))
 
 from mor import *
 
 from mor.morprojector import MORProjector
 import time
+
+resultdir = "mor_results"
 
 
 class Timer(object):
@@ -25,6 +27,13 @@ class Timer(object):
         if self.name:
             print(f"[{self.name}]")
             print(f"Elapsed: {time.time() - self.tstart}")
+
+
+def create_directories():
+    output_dir = f"{script_dir}/{resultdir}/poisson"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    return output_dir
 
 
 N = 256
@@ -82,7 +91,13 @@ with Timer("Reduced solve"):
 
 u.rename("ROM solution")
 
-output_pvd = fd.File("solution.pvd")
-output_pvd.write(full_solve_sol, u)
+output_dir = create_directories()
 
-print(errornorm(full_solve_sol, u))
+output_pvd_rom = File(f"{output_dir}/poisson_solution.pvd")
+output_pvd_rom.write(full_solve_sol, u)
+
+error_norm = errornorm(full_solve_sol, u)
+print(error_norm)
+
+# Assert that the error is below a certain threshold
+assert error_norm < 1e-5  # You can adjust the threshold as needed
