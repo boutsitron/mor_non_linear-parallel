@@ -1,5 +1,8 @@
 # MOR
-[firedrake](https://firedrakeproject.org/) backend based model order reduction tools based on Proper Orthogonal Decomposition.
+[Firedrake](https://firedrakeproject.org/) backend-based Model Order Reduction tools based on Proper Orthogonal Decomposition.
 
-# TODO
-* Not tested in parallel (presumably needs some experienced work and thought)
+This fork is created to address:
+
+- dofs in mixed spaces
+- non-linear problems
+- parallel capabilities
