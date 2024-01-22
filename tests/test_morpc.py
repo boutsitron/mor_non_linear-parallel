@@ -1,5 +1,4 @@
 from firedrake import *
-import firedrake as fd
 import sys
 import os
 

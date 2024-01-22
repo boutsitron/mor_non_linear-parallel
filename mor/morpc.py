@@ -1,5 +1,6 @@
-from firedrake import PCBase
-from firedrake.assemble import allocate_matrix, create_assembly_callable
+from __future__ import absolute_import, print_function
+from firedrake import PCBase, assemble
+from firedrake.assemble import allocate_matrix
 from firedrake.petsc import PETSc
 
 
@@ -23,8 +24,8 @@ class MORPC(PCBase):
         KpInv = PETSc.KSP().create()
         KpInv.setOperators(Kp)
         # KpInv.setType("preonly")
-        # KpInvPC = KpInv.getPC()
-        # KpInvPC.setFactorSolverType("mumps")
+        KpInvPC = KpInv.getPC()
+        KpInvPC.setFactorSolverType("mumps")
         KpInv.setUp()
         self.KpInv = KpInv
 
@@ -61,13 +62,16 @@ class MORPC(PCBase):
             mat_type=mat_type,
         )
 
-        self._assemble_K = create_assembly_callable(
-            ctx.a,
-            tensor=self.K,
-            bcs=ctx.row_bcs,
-            form_compiler_parameters=ctx.fc_params,
-            mat_type=mat_type,
-        )
+        # Encapsulate the assembly process in a method
         self._assemble_K()
 
-        self.mat_type = mat_type
+    def _assemble_K(self):
+        # Perform the assembly
+        assemble(
+            self.ctx.a,
+            tensor=self.K,
+            bcs=self.ctx.row_bcs,
+            form_compiler_parameters=self.ctx.fc_params,
+        )
+
+        self.mat_type = self.K.mat_type
