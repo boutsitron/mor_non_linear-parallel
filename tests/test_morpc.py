@@ -35,68 +35,72 @@ def create_directories():
     return output_dir
 
 
-N = 256
+def test_mor_solution_accuracy():
 
-mesh = UnitSquareMesh(N, N)
+    N = 256
 
-V = FunctionSpace(mesh, "CG", 2)
+    mesh = UnitSquareMesh(N, N)
 
-u = Function(V)
-v = TestFunction(V)
+    V = FunctionSpace(mesh, "CG", 2)
 
-x = SpatialCoordinate(mesh)
-f = Function(V)
-f.interpolate(sin(x[0] * pi) * sin(2 * x[1] * pi))
+    u = Function(V)
+    v = TestFunction(V)
 
-R = inner(grad(u), grad(v)) * dx - f * v * dx
+    x = SpatialCoordinate(mesh)
+    f = Function(V)
+    f.interpolate(sin(x[0] * pi) * sin(2 * x[1] * pi))
 
-bcs = [DirichletBC(V, Constant(2.0), (1,))]
+    R = inner(grad(u), grad(v)) * dx - f * v * dx
 
-# Full solve
-with Timer("Full solve"):
-    solve(
-        R == 0, u, bcs=bcs, solver_parameters={"ksp_type": "preonly", "pc_type": "lu"}
+    bcs = [DirichletBC(V, Constant(2.0), (1,))]
+
+    # Full solve
+    with Timer("Full solve"):
+        solve(
+            R == 0,
+            u,
+            bcs=bcs,
+            solver_parameters={"ksp_type": "preonly", "pc_type": "lu"},
+        )
+
+    full_solve_sol = Function(V)
+    full_solve_sol.assign(u)
+    full_solve_sol.rename("FOM solution")
+
+    morproj = MORProjector()
+    morproj.take_snapshot(u)
+    morproj.compute_basis(1, "L2")
+    basis_mat = morproj.get_basis_mat()
+
+    print(basis_mat.getSizes())
+
+    appctx = {"projection_mat": basis_mat}
+
+    prob = NonlinearVariationalProblem(R, u, bcs=bcs)
+    solver = NonlinearVariationalSolver(
+        prob,
+        appctx=appctx,
+        solver_parameters={
+            "snes_type": "ksponly",
+            "mat_type": "matfree",
+            "ksp_type": "preonly",
+            "pc_type": "python",
+            "pc_python_type": "mor.morpc.MORPC",
+        },
     )
 
-full_solve_sol = Function(V)
-full_solve_sol.assign(u)
-full_solve_sol.rename("FOM solution")
+    with Timer("Reduced solve"):
+        solver.solve()
 
+    u.rename("ROM solution")
 
-morproj = MORProjector()
-morproj.take_snapshot(u)
-morproj.compute_basis(1, "L2")
-basis_mat = morproj.get_basis_mat()
+    output_dir = create_directories()
 
-print(basis_mat.getSizes())
+    output_pvd_rom = File(f"{output_dir}/poisson_solution.pvd")
+    output_pvd_rom.write(full_solve_sol, u)
 
-appctx = {"projection_mat": basis_mat}
+    error_norm = errornorm(full_solve_sol, u)
+    print(error_norm)
 
-prob = NonlinearVariationalProblem(R, u, bcs=bcs)
-solver = NonlinearVariationalSolver(
-    prob,
-    appctx=appctx,
-    solver_parameters={
-        "snes_type": "ksponly",
-        "mat_type": "matfree",
-        "ksp_type": "preonly",
-        "pc_type": "python",
-        "pc_python_type": "mor.morpc.MORPC",
-    },
-)
-
-with Timer("Reduced solve"):
-    solver.solve()
-
-u.rename("ROM solution")
-
-output_dir = create_directories()
-
-output_pvd_rom = File(f"{output_dir}/poisson_solution.pvd")
-output_pvd_rom.write(full_solve_sol, u)
-
-error_norm = errornorm(full_solve_sol, u)
-print(error_norm)
-
-# Assert that the error is below a certain threshold
-assert error_norm < 1e-5  # You can adjust the threshold as needed
+    # Assert that the error is below a certain threshold
+    assert error_norm < 1e-5  # You can adjust the threshold as needed
