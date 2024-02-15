@@ -1,4 +1,5 @@
-from firedrake import *
+from firedrake import inner, grad, dx, sin, pi
+import firedrake as fd
 import sys
 import os
 
@@ -6,8 +7,6 @@ import os
 script_dir = os.path.dirname(os.path.abspath(__file__))
 # Add the parent directory (or another appropriate directory) to sys.path
 sys.path.append(os.path.join(script_dir, ".."))
-
-from mor import *
 
 from mor.morprojector import MORProjector
 import time
@@ -39,31 +38,31 @@ def test_mor_solution_accuracy():
 
     N = 256
 
-    mesh = UnitSquareMesh(N, N)
+    mesh = fd.UnitSquareMesh(N, N)
 
-    V = FunctionSpace(mesh, "CG", 2)
+    V = fd.FunctionSpace(mesh, "CG", 2)
 
-    u = Function(V)
-    v = TestFunction(V)
+    u = fd.Function(V)
+    v = fd.TestFunction(V)
 
-    x = SpatialCoordinate(mesh)
-    f = Function(V)
+    x = fd.SpatialCoordinate(mesh)
+    f = fd.Function(V)
     f.interpolate(sin(x[0] * pi) * sin(2 * x[1] * pi))
 
     R = inner(grad(u), grad(v)) * dx - f * v * dx
 
-    bcs = [DirichletBC(V, Constant(2.0), (1,))]
+    bcs = [fd.DirichletBC(V, fd.Constant(2.0), (1,))]
 
     # Full solve
     with Timer("Full solve"):
-        solve(
+        fd.solve(
             R == 0,
             u,
             bcs=bcs,
             solver_parameters={"ksp_type": "preonly", "pc_type": "lu"},
         )
 
-    full_solve_sol = Function(V)
+    full_solve_sol = fd.Function(V)
     full_solve_sol.assign(u)
     full_solve_sol.rename("FOM solution")
 
@@ -76,8 +75,8 @@ def test_mor_solution_accuracy():
 
     appctx = {"projection_mat": basis_mat}
 
-    prob = NonlinearVariationalProblem(R, u, bcs=bcs)
-    solver = NonlinearVariationalSolver(
+    prob = fd.NonlinearVariationalProblem(R, u, bcs=bcs)
+    solver = fd.NonlinearVariationalSolver(
         prob,
         appctx=appctx,
         solver_parameters={
@@ -96,10 +95,10 @@ def test_mor_solution_accuracy():
 
     output_dir = create_directories()
 
-    output_pvd_rom = File(f"{output_dir}/poisson_solution.pvd")
+    output_pvd_rom = fd.File(f"{output_dir}/poisson_solution.pvd")
     output_pvd_rom.write(full_solve_sol, u)
 
-    error_norm = errornorm(full_solve_sol, u)
+    error_norm = fd.errornorm(full_solve_sol, u)
     print(error_norm)
 
     # Assert that the error is below a certain threshold
