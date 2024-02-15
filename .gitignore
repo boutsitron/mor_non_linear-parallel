@@ -1,6 +1,7 @@
 *.pvd
 *.*vtu
 docs/build
-*/__pycache__
+**/__pycache__
 .DS_Store
 commit.dat
+

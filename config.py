@@ -8,22 +8,7 @@
 #
 import os
 
-from colorama import Fore, Style
 from firedrake import COMM_WORLD
-from firedrake.petsc import PETSc
-
-rank = COMM_WORLD.rank
-
-
-def Print(message: str, color: str = Fore.WHITE):
-    """Print function that prints only on rank 0 with color
-
-    Args:
-        message (str): message to be printed
-        color (str, optional): color of the message. Defaults to Fore.WHITE.
-    """
-    PETSc.Sys.Print(f"{color}{message}{Style.RESET_ALL}")
-
 
 # Directories for saving files
 OUTDIR = "./"
