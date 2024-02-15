@@ -26,14 +26,13 @@ def create_neumann_bcs(inlets, boundary_conditions, F, v):
     return bcs, F
 
 
-def define_problem(Re, inlets, outlets, meshfile):
+def define_problem(Re, inlets, outlets, mesh):
 
     boundary_conditions = {
         "INLET": tuple(inlets.keys()),
         "OUTLET": tuple(outlets),
         "WALLS": 3,
     }
-    mesh = fd.Mesh(config.MESHDIR + meshfile)
     V = fd.VectorFunctionSpace(mesh, "CG", 2)
     Q = fd.FunctionSpace(mesh, "CG", 1)
     W = V * Q
@@ -54,7 +53,7 @@ def define_problem(Re, inlets, outlets, meshfile):
     return F, up, bcs
 
 
-def solve_ns(F, up, bcs, iter):
+def solve_ns(F, up, bcs, iter, initial_guess=None):
 
     solver_parameters_direct = {
         "snes_monitor": None,
@@ -69,12 +68,16 @@ def solve_ns(F, up, bcs, iter):
     solver = fd.NonlinearVariationalSolver(
         problem, solver_parameters=solver_parameters_direct
     )
+    if initial_guess is not None:
+        solver._problem.u.assign(initial_guess)
     solver.solve()
     u_plot, p_plot = up.subfunctions
     u_plot.rename("velocity")
     p_plot.rename("pressure")
     stokes_pvd = fd.File(f"{config.RESULTDIR}/navier_stokes.pvd")
     stokes_pvd.write(u_plot, p_plot, time=iter)
+
+    return up
 
 
 if __name__ == "__main__":
@@ -106,15 +109,18 @@ if __name__ == "__main__":
         lx=lx,
         ly=ly,
         meshfile=meshfile,
-        DIVISIONS=100,
+        DIVISIONS=300,
     )
 
+    mesh = fd.Mesh(config.MESHDIR + meshfile)
+
+    current_solution = None
     for i in range(10, 200, 10):
 
         Re = fd.Constant(i)
 
         Print(f"{Fore.YELLOW}Solving for Re = {i}{Fore.RESET}")
 
-        F, up, flow_bcs = define_problem(Re, inlets, outlets, meshfile)
-        solve_ns(F, up, flow_bcs, iter=i)
+        F, up, flow_bcs = define_problem(Re, inlets, outlets, mesh)
+        current_solution = solve_ns(F, up, flow_bcs, i, initial_guess=current_solution)
         Print("")
