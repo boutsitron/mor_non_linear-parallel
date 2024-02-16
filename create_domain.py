@@ -8,7 +8,8 @@ import numpy as np
 from colorama import Fore
 from firedrake import COMM_WORLD
 
-import config
+meshdir = "meshes/"
+
 
 sys.path.append("..")
 
@@ -38,34 +39,33 @@ def create_domain(
 
     Args:
         inlet_positions (list): positions of the inlet branches of the type (x1, y1, x2, y2) where
-        (x1, y1) are the coordinates of the first node componing the inlet edge and
-        (x2, y2)are the coordinates of the second node componing the edge. It is required
-        that either x1 == x2 or y1 == y2 and that either x1 \in {0, lx} or x2 \in {0, ly},
-        meaning that the passed coordinates should be points on the boundary of the
-        design domain [0, lx] \times [0, ly]
-        outlet_positions (list): positions of the outlet branches of the type (x1, y1, x2, y2) where
-        (x1, y1) are the coordinates of the first node componing the inlet edge and
-        (x2, y2) are the coordinates of the second node componing the edge. It is required
-        that either x1 == x2 or y1 == y2 and that either x1 \in {0, lx} or x2 \in {0, ly},
-        meaning that the passed coordinates should be points on the boundary of the
-        design domain [0, lx] \times [0, ly]
+                                (x1, y1) are the coordinates of the first node componing the inlet edge and
+                                (x2, y2) are the coordinates of the second node componing the edge. It is required
+                                that either x1 == x2 or y1 == y2 and that either x1 \in {0, lx} or x2 \in {0, ly},
+                                meaning that the passed coordinates should be points on the boundary of the
+                                design domain [0, lx] \times [0, ly]
+        outlet_positions (list): positions of the outlet branches of the type (x1, y1, x2, y2) where (x1, y1) are the
+                                 coordinates of the first node componing the inlet edge and
+                                 (x2, y2) are the coordinates of the second node componing the edge. It is required
+                                 that either x1 == x2 or y1 == y2 and that either x1 \in {0, lx} or x2 \in {0, ly},
+                                 meaning that the passed coordinates should be points on the boundary of the
+                                 design domain [0, lx] \times [0, ly]
         buffer_length (float): length of the inlet and outlet branches, meaning the lateral deviation from the
-        coordinates passed to inlet_positions and outlet_positions
+                               coordinates passed to inlet_positions and outlet_positions
         lx (float): x-length of the design domain
         ly (float): y-length of the design domain
         DIVISIONS (int): number of divisions to use in the mesh
         meshfile (str): .msh file to be imported as a mesh, this is created before the start of the optimization
-        by the method create_domain in utils/create_domain.py
+                        by the method create_domain in utils/create_domain.py
         mesh_size (float): characteristic length of the mesh. Defaults to None, in which case it is set to
-        min(lx, ly) / DIVISIONS
-        design_id (int): ID to utilize for the design domain, namely the inner rectangle [0, lx] \times [0, ly],
-        defaults to 3
+                           min(lx, ly) / DIVISIONS
+        design_id (int): ID to use for the design domain, namely the inner rectangle [0, lx] x [0, ly], defaults to 3
         non_design_id (int): ID to utilize for the non design domain, defaults to 1
 
     Return:
         inlet (dict): a dictionary of the inlets with key given by the ID of the inlet to use in Firedrake
-        and pair a tuple given by (sign of the outward pressure direction depending on the position
-        of the inlet, component of the test function which is not cancelled out in the weak formulation)
+                      and pair a tuple given by (sign of the outward pressure direction depending on the position
+                      of the inlet, component of the test function which is not cancelled out in the weak formulation)
         outlet (list): a list with the IDs of the outlets to use in Firedrake
         design_id (int): ID of the design domain (unchanged with respect to the input variable design_id)
         non_design_id (int): ID to utilize for the non design domain,
@@ -157,8 +157,8 @@ def create_domain(
         gmsh.model.mesh.generate(2)
 
         # Save the model
-        print(f"Saving mesh to {config.MESHDIR + meshfile}")
-        gmsh.write(config.MESHDIR + meshfile)
+        print(f"Saving mesh to {meshdir + meshfile}")
+        gmsh.write(meshdir + meshfile)
 
         gmsh.finalize()
 
@@ -271,12 +271,12 @@ def boundary_splitting(
 
     Returns:
         inlet (dict): dictionary with keys the IDs of the inlet and values a tuple with:
-        1. sign of the normal to the boundary (1 or -1)
-        2. component of the test function which is not cancelled out by
-        the previous sign in the computation (0 or 1)
+                            1. sign of the normal to the boundary (1 or -1)
+                            2. component of the test function which is not cancelled out by
+                               the previous sign in the computation (0 or 1)
         outlet (list): list of outlets IDs
         non_walls (list): list of interfaces between branches and design domain to be cancelled out from the walls for
-        correct BCs imposition
+                          correct BCs imposition
     """
     lines = gmsh.model.occ.getEntities(dim=1)
 
