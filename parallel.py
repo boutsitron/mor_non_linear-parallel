@@ -7,21 +7,9 @@
 # Copyright (c) 2022 Athanasios Boutsikakis
 #
 #
-import contextlib
-import gc
-import sys
-
-import numpy as np
 from colorama import Fore, Style
-from firedrake import COMM_SELF, COMM_WORLD
+from firedrake import COMM_WORLD
 from firedrake.petsc import PETSc
-from mpi4py import MPI
-
-with contextlib.suppress(ImportError):
-    import slepc4py
-
-    slepc4py.init(sys.argv)
-    from slepc4py import SLEPc
 
 rank = COMM_WORLD.rank
 nproc = COMM_WORLD.size
