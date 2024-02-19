@@ -1,8 +1,12 @@
 from __future__ import absolute_import, print_function
+
+import numpy as np
+from colorama import Fore, Style
 from firedrake import PCBase, assemble
 from firedrake.assemble import allocate_matrix
 from firedrake.petsc import PETSc
-from colorama import Fore, Style
+
+from parallel import create_petsc_matrix
 
 tab = "    "
 
@@ -35,9 +39,6 @@ class MORPC(PCBase):
         # Project the Jacobian onto the reduced basis
         Kp = K.ptap(self.Z)
 
-        # kp_norm = Kp.norm()
-        # Print(f"{tab} Norm of projected Jacobian matrix: {kp_norm:.8e}", Fore.RED)
-
         m, k = Kp.getSize()
         assert m == k, "Projected matrix is not square!"
 
@@ -49,17 +50,16 @@ class MORPC(PCBase):
         KpInvPC.setFactorSolverType("lu")  # mumps
         # KpInv.setUp()
         self.KpInv = KpInv
-        # Print(f"{tab} Solving with: {KpInv.getType()}", Fore.MAGENTA)
-        # Print(
-        #     f"{tab} Linear truncated system [{k}x{k}] converged in {KpInv.getIterationNumber()} iterations.",
-        #     Fore.MAGENTA,
-        # )
+        Print(f"{tab} Setting reduced system with: {KpInv.getType()}", Fore.MAGENTA)
 
         # Create reduced space vectors
         self.Xp, _ = self.Z.createVecs()
         self.Yp, _ = self.Z.createVecs()
 
     def update(self, pc):
+
+        Print("Updating the PC", Fore.CYAN)
+
         _, K = pc.getOperators()
         self.ctx = K.getPythonContext()
 
@@ -71,10 +71,6 @@ class MORPC(PCBase):
 
         # Project the Jacobian onto the reduced basis
         Kp = K.ptap(self.Z)
-        kp_norm = Kp.norm()
-        # Print(
-        #     f"{tab} Norm of updated projected Jacobian matrix: {kp_norm:.8e}", Fore.RED
-        # )
 
         # Update the inverse of the projected Jacobian
         self.KpInv.setOperators(Kp)
@@ -90,9 +86,8 @@ class MORPC(PCBase):
             X (PETSc.Vec): residual vector (input) in the full space
             Y (PETSc.Vec): solution increment vector (output) in the full space
         """
-        # Print the norm of the input residual (X) for diagnostics
-        # X_norm = X.norm()
-        # Print(f"{tab} Norm of input residual: {X_norm:.8e}", Fore.CYAN)
+        self.Z = self.ctx.appctx.get("projection_mat", None)
+        _, k = self.Z.getSize()
 
         # Project X and Y into the projected space
         # self.Z.multTranspose(Y, self.Yp)
@@ -101,17 +96,14 @@ class MORPC(PCBase):
         # Solve in the reduced space for the solution increment in the reduced space
         self.KpInv.solve(self.Xp, self.Yp)  # Yp = KpInv * Xp
 
-        Yp_norm = self.Yp.norm()
-        # Print(f"{tab} Norm of projected solution increment: {Yp_norm:.8e}", Fore.CYAN)
+        Print(
+            f"{tab} Linear truncated system [{k}x{k}] converged in {self.KpInv.getIterationNumber()} iterations.",
+            Fore.MAGENTA,
+        )
 
         # Project x back to original space
         # self.Z.mult(self.Xp, X)  # X [mx1] = Phi [mxk] * Xp [kx1]
         self.Z.mult(self.Yp, Y)  # Y [mx1] = Phi [mxk] * Yp [kx1]
-
-        # Optionally, print the norm of the output solution increment (Y) for diagnostics
-        # Y_norm = Y.norm()
-        # Print(f"{tab} Norm of output solution increment: {Y_norm:.8e}", Fore.CYAN)
-        # Print("")
 
     def applyTranspose(self, pc, X, Y):
         pass

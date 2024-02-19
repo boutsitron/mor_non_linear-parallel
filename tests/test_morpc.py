@@ -1,15 +1,17 @@
-from firedrake import inner, grad, dx, sin, pi
-import firedrake as fd
-import sys
 import os
+import sys
+
+import firedrake as fd
+from firedrake import dx, grad, inner, pi, sin
 
 # Get the directory of the current file
 script_dir = os.path.dirname(os.path.abspath(__file__))
 # Add the parent directory (or another appropriate directory) to sys.path
 sys.path.append(os.path.join(script_dir, ".."))
 
-from mor.morprojector import MORProjector
 import time
+
+from mor.morprojector import MORProjector
 
 resultdir = "mor_results"
 
@@ -70,8 +72,6 @@ def test_mor_solution_accuracy():
     morproj.take_snapshot(u)
     morproj.compute_basis(1, "L2")
     basis_mat = morproj.get_basis_mat()
-
-    print(basis_mat.getSizes())
 
     appctx = {"projection_mat": basis_mat}
 

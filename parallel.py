@@ -8,7 +8,7 @@
 #
 #
 from colorama import Fore, Style
-from firedrake import COMM_WORLD
+from firedrake import COMM_SELF, COMM_WORLD
 from firedrake.petsc import PETSc
 
 rank = COMM_WORLD.rank

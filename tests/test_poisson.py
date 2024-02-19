@@ -1,13 +1,11 @@
-import os
 import itertools
-import numpy as np
-import firedrake as fd
-from firedrake import sin, cos, pi, dot, div, dx, ds
+import os
+import sys
 import time
 
-
-import sys
-import os
+import firedrake as fd
+import numpy as np
+from firedrake import cos, div, dot, ds, dx, pi, sin
 
 # Get the directory of the current file
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -98,8 +96,6 @@ def test_parametric_poisson():
     n_basis = min(50, parameter_counter)  # For example, up to 50 basis vectors
     morproj.compute_basis(n_basis, "L2")
     basis_mat = morproj.get_basis_mat()
-
-    print(basis_mat.getSizes())
 
     # Define appctx for the custom preconditioner
     appctx = {"projection_mat": basis_mat}
